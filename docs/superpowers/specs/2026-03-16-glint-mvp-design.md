@@ -65,25 +65,28 @@ Expanded view: full raw output of that turn, rendered with ANSI colors.
 
 ### `pty_manager.py`
 - Spawns the child process (`claude`, `opencode`, or any command) in a pseudo-terminal via `ptyprocess`
-- Reads stdout/stderr asynchronously, writes to Turn Parser
-- Passes stdin keystrokes through to child process (except Glint hotkeys)
+- Runs PTY reading in a **background thread** (ptyprocess is synchronous, not async)
+- Posts output chunks to the Textual app via `app.call_from_thread(app.post_message, ...)`
+- Forwards stdin bytes from Glint's input bar to the child PTY
+- Propagates terminal resize events (SIGWINCH) to the child PTY via `ptyprocess.setwinsize()`
 
 ### `turn_parser.py`
 - Maintains a buffer of incoming bytes
 - Detects **turn boundaries**: a new turn starts when the user submits input (Enter keypress is detected on stdin path)
-- Emits `Turn` objects: `{id, prompt_text, response_bytes, is_complete}`
+- Emits `Turn` dataclass: `id: int, prompt_text: str, response_bytes: bytearray, is_complete: bool`
 - Streams partial response bytes to the active turn as they arrive
 
 ### `app.py` (Textual App)
 - Main TUI application
-- Layout: full-screen turn list + bottom input bar
-- Receives `Turn` objects via Textual message queue (thread-safe)
+- Layout: full-screen `TurnList` (scrollable) + bottom `PromptInput` bar
+- **Focus model**: `PromptInput` holds keyboard focus by default (user types prompts); `TurnList` receives navigation keys (`j`/`k`/`Enter`) intercepted at app level via `on_key()`, regardless of which widget has focus
+- Receives `Turn` objects via Textual message queue (thread-safe, posted from PTY thread)
 - Manages focus and keyboard navigation
 
 ### `widgets/turn_widget.py`
 - Displays one turn in collapsed or expanded state
-- **Collapsed**: `▶ Turn N — [first line of response, truncated to 60 chars]`
-- **Expanded**: full response rendered with ANSI escape sequences
+- **Collapsed**: `▶ Turn N — [first non-empty line of ANSI-stripped response, max 60 chars]`
+- **Expanded**: full response rendered via `rich.text.Text.from_ansi(response_bytes.decode("utf-8", errors="replace"))` — preserves colors correctly inside a Textual `Static` widget
 
 ---
 
@@ -98,8 +101,11 @@ Expanded view: full raw output of that turn, rendered with ANSI colors.
 
 **Edge cases**:
 - Multi-line input (Shift+Enter): accumulate, boundary only on plain Enter
-- Child process exits: flush final turn as complete
+- Child process exits: flush final turn as complete, mark `is_complete=True`
 - Initial output before first prompt: captured as Turn 0 with empty prompt (startup messages)
+- User navigates to a past turn while latest turn is still streaming: allowed; the active turn continues accumulating in the background, TurnWidget updates when re-expanded
+- Child process exit code non-zero: display exit code in Turn 0's header but do not crash
+- `claude`/`opencode` not found on PATH: surface error immediately, exit with message
 
 ---
 
@@ -144,9 +150,18 @@ Expanded view: full raw output of that turn, rendered with ANSI colors.
 
 - **Language**: Python 3.11+
 - **TUI Framework**: [Textual](https://textual.textualize.io/)
-- **PTY**: `ptyprocess` library
-- **ANSI rendering**: Textual's built-in `RichLog` or `Static` with `markup=False, highlight=False`
+- **PTY**: `ptyprocess` library (synchronous; run in background thread, bridge via `app.call_from_thread`)
+- **ANSI rendering**: `rich.text.Text.from_ansi()` inside a Textual `Static` widget — do NOT use `markup=False` alone, it won't strip ANSI escape codes
 - **Packaging**: `pyproject.toml` + `uv`, installable via `pip install glint-tui`
+
+### Threading Model
+
+```
+Main thread: Textual event loop (UI, keyboard, rendering)
+PTY thread:  ptyprocess.read() loop → app.call_from_thread(post_message)
+```
+
+The PTY thread NEVER touches Textual widgets directly. All communication goes through `call_from_thread`.
 
 ---
 
