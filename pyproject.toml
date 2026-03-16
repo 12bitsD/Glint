@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "glint-tui"
+version = "0.1.0"
+description = "AI Agent 时代的终端阅读器"
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.60.0",
+    "ptyprocess>=0.7.0",
+]
+
+[project.scripts]
+glint = "glint.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["glint"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-textual-snapshot>=0.4",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
