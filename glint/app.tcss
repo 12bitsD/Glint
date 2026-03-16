@@ -1,0 +1,19 @@
+#turn-list {
+    height: 1fr;
+    overflow-y: auto;
+}
+
+#prompt-input {
+    height: 3;
+    dock: bottom;
+}
+
+TurnWidget {
+    padding: 0 1;
+    border-bottom: dashed $panel-darken-1;
+}
+
+TurnWidget.focused {
+    background: $boost;
+    border-left: thick $accent;
+}
