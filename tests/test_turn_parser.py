@@ -37,3 +37,56 @@ def test_turn_summary_truncates():
     t = Turn(id=5, prompt_text="")
     t.response_bytes.extend(("x" * 100 + "\n").encode())
     assert len(t.summary()) == 60
+
+
+from glint.turn_parser import TurnParser
+
+
+def test_parser_initial_state():
+    p = TurnParser()
+    assert p.turns == []
+    assert p.current_turn is None
+
+
+def test_parser_startup_output_before_prompt():
+    p = TurnParser()
+    p.feed_output(b"Welcome to claude\n")
+    assert len(p.turns) == 1
+    assert p.turns[0].id == 0
+    assert p.turns[0].prompt_text == ""
+    assert b"Welcome to claude" in p.turns[0].response_bytes
+
+
+def test_parser_prompt_opens_new_turn():
+    p = TurnParser()
+    p.feed_output(b"startup\n")
+    p.feed_prompt("fix the bug")
+    assert len(p.turns) == 2
+    assert p.current_turn.id == 1
+    assert p.current_turn.prompt_text == "fix the bug"
+
+
+def test_parser_output_goes_to_current_turn():
+    p = TurnParser()
+    p.feed_prompt("hello")
+    p.feed_output(b"AI response here\n")
+    assert b"AI response here" in p.current_turn.response_bytes
+
+
+def test_parser_complete_marks_turn():
+    p = TurnParser()
+    p.feed_prompt("go")
+    p.feed_output(b"done\n")
+    p.complete_current_turn()
+    assert p.turns[-1].is_complete is True
+
+
+def test_parser_multiple_turns():
+    p = TurnParser()
+    p.feed_prompt("turn 1")
+    p.feed_output(b"response 1\n")
+    p.feed_prompt("turn 2")
+    p.feed_output(b"response 2\n")
+    assert len(p.turns) == 2
+    assert b"response 1" in p.turns[0].response_bytes
+    assert b"response 2" in p.turns[1].response_bytes
