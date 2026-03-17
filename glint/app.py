@@ -6,7 +6,7 @@ import signal
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import ScrollableContainer
-from textual.widgets import Footer, Header, Input
+from textual.widgets import Input
 
 from glint.pty_manager import PTYManager
 from glint.turn_parser import Turn, TurnParser
@@ -17,13 +17,9 @@ class GlintApp(App):
     CSS_PATH = "app.tcss"
 
     BINDINGS = [
-        Binding("j", "focus_next_turn", "Next", show=True),
-        Binding("k", "focus_prev_turn", "Prev", show=True),
-        Binding("enter", "toggle_turn", "Expand", show=True),
-        Binding("g", "focus_first_turn", "Top", show=False),
-        Binding("G", "focus_last_turn", "Bottom", show=False),
-        Binding("`", "toggle_raw", "Raw", show=True),
-        Binding("q", "quit", "Quit", show=True),
+        Binding("up,k", "focus_prev_turn", show=False),
+        Binding("down,j", "focus_next_turn", show=False),
+        Binding("enter", "toggle_turn", show=False),
     ]
 
     def __init__(self, command: list[str]) -> None:
@@ -34,10 +30,8 @@ class GlintApp(App):
         self.focused_turn_id: int | None = None
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
         yield ScrollableContainer(id="turn-list")
-        yield Input(placeholder="> ", id="prompt-input")
-        yield Footer()
+        yield Input(placeholder="", id="prompt-input")
 
     def on_mount(self) -> None:
         try:
@@ -132,26 +126,11 @@ class GlintApp(App):
             self.focused_turn_id = ids[max(idx - 1, 0)]
         self._highlight_focused()
 
-    def action_focus_first_turn(self) -> None:
-        widgets = self._get_turn_widgets()
-        if widgets:
-            self.focused_turn_id = widgets[0].turn.id
-            self._highlight_focused()
-
-    def action_focus_last_turn(self) -> None:
-        widgets = self._get_turn_widgets()
-        if widgets:
-            self.focused_turn_id = widgets[-1].turn.id
-            self._highlight_focused()
-
     def action_toggle_turn(self) -> None:
         for w in self._get_turn_widgets():
             if w.turn.id == self.focused_turn_id:
                 w.toggle()
                 break
-
-    def action_toggle_raw(self) -> None:
-        self.notify("Raw view not yet implemented")
 
     def _highlight_focused(self) -> None:
         for w in self._get_turn_widgets():

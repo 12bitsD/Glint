@@ -14,14 +14,23 @@ class _TestApp(App):
         yield self._widget
 
 
-async def test_turn_widget_collapsed_shows_summary():
+async def test_turn_widget_collapsed_shows_prompt():
     turn = Turn(id=1, prompt_text="fix the bug")
     turn.response_bytes.extend(b"I'll fix the bug in auth.py\n")
     widget = TurnWidget(turn=turn)
 
     async with _TestApp(widget).run_test() as pilot:
         assert widget.is_expanded is False
-        assert "fix the bug in auth.py" in widget.collapsed_text()
+        assert "fix the bug" in widget.collapsed_text()
+
+
+async def test_turn_widget_collapsed_falls_back_to_summary_when_no_prompt():
+    turn = Turn(id=1, prompt_text="")
+    turn.response_bytes.extend(b"startup output line\n")
+    widget = TurnWidget(turn=turn)
+
+    async with _TestApp(widget).run_test() as pilot:
+        assert "startup output line" in widget.collapsed_text()
 
 
 async def test_turn_widget_toggle_expands():

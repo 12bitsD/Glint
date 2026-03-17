@@ -1,19 +1,43 @@
+Screen {
+    layers: base;
+}
+
 #turn-list {
     height: 1fr;
     overflow-y: auto;
+    padding: 0;
 }
 
 #prompt-input {
-    height: 3;
+    height: 1;
     dock: bottom;
+    border: none;
+    background: $surface;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#prompt-input:focus {
+    border: none;
+    color: $text;
 }
 
 TurnWidget {
+    height: auto;
     padding: 0 1;
-    border-bottom: dashed $panel-darken-1;
+    border-top: solid $panel-darken-2;
 }
 
 TurnWidget.focused {
-    background: $boost;
-    border-left: thick $accent;
+    border-left: outer $accent;
+    padding-left: 0;
+}
+
+TurnWidget:first-child {
+    border-top: none;
+}
+
+#expanded-content {
+    padding: 0 0 1 3;
+    color: $text-muted;
 }

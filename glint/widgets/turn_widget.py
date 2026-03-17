@@ -10,48 +10,45 @@ from glint.turn_parser import Turn
 
 
 class TurnWidget(Widget):
-    is_expanded: reactive[bool] = reactive(False)
+    is_expanded: reactive[bool] = reactive(False, init=False)
 
     def __init__(self, turn: Turn) -> None:
         super().__init__()
         self.turn = turn
 
     def compose(self) -> ComposeResult:
-        summary = self.turn.summary()
-        prefix = f"▶ Turn {self.turn.id}"
-        if self.turn.prompt_text:
-            prefix += f" — {self.turn.prompt_text[:40]}"
-        yield Label(f"{prefix}  {summary}", id="collapsed-label")
+        yield Label(self._collapsed_label(expanded=False), id="collapsed-label")
         yield Static("", id="expanded-content")
 
     def on_mount(self) -> None:
         self._refresh_display()
 
     def watch_is_expanded(self, value: bool) -> None:
-        self._refresh_display()
+        if self.is_attached:
+            self._refresh_display()
+
+    def _collapsed_label(self, expanded: bool) -> str:
+        prompt = self.turn.prompt_text[:60] if self.turn.prompt_text else self.turn.summary()
+        indicator = "↓" if expanded else "›"
+        return f"{indicator}  {prompt}"
 
     def _refresh_display(self) -> None:
         collapsed = self.query_one("#collapsed-label", Label)
         expanded = self.query_one("#expanded-content", Static)
 
         if self.is_expanded:
-            collapsed.display = False
+            collapsed.update(self._collapsed_label(expanded=True))
+            collapsed.display = True
             raw = self.turn.response_bytes.decode("utf-8", errors="replace")
             expanded.update(Text.from_ansi(raw))
             expanded.display = True
         else:
-            summary = self.turn.summary()
-            prefix = "▶"
-            collapsed.update(
-                f"{prefix} Turn {self.turn.id}"
-                + (f" — {self.turn.prompt_text[:40]}" if self.turn.prompt_text else "")
-                + f"  {summary}"
-            )
+            collapsed.update(self._collapsed_label(expanded=False))
             collapsed.display = True
             expanded.display = False
 
     def collapsed_text(self) -> str:
-        return self.query_one("#collapsed-label", Label).content
+        return self._collapsed_label(expanded=self.is_expanded)
 
     def toggle(self) -> None:
         self.is_expanded = not self.is_expanded
