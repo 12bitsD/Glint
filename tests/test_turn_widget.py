@@ -44,3 +44,20 @@ async def test_turn_widget_expanded_shows_full_content():
         widget.toggle()
         expanded = widget.query_one("#expanded-content")
         assert expanded.display is True
+
+
+async def test_turn_widget_append_output_updates_expanded_view():
+    turn = Turn(id=4, prompt_text="stream")
+    turn.response_bytes.extend(b"initial line\n")
+    widget = TurnWidget(turn=turn)
+
+    async with _TestApp(widget).run_test() as pilot:
+        widget.toggle()
+        assert widget.is_expanded is True
+
+        widget.append_output(b"new line\n")
+        await pilot.pause(0.1)
+
+        assert b"initial line" in widget.turn.response_bytes
+        assert b"new line" in widget.turn.response_bytes
+        assert widget.is_expanded is True

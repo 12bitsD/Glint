@@ -90,3 +90,28 @@ def test_parser_multiple_turns():
     assert len(p.turns) == 2
     assert b"response 1" in p.turns[0].response_bytes
     assert b"response 2" in p.turns[1].response_bytes
+
+
+def test_parser_previous_turn_completed_on_new_prompt():
+    p = TurnParser()
+    p.feed_output(b"startup\n")
+    assert p.turns[0].is_complete is False
+    p.feed_prompt("hello")
+    assert p.turns[0].is_complete is True
+
+
+def test_parser_consecutive_prompts_no_output():
+    p = TurnParser()
+    p.feed_prompt("prompt 1")
+    p.feed_prompt("prompt 2")
+    assert len(p.turns) == 2
+    assert p.turns[0].is_complete is True
+    assert p.turns[0].response_bytes == bytearray()
+    assert p.turns[1].prompt_text == "prompt 2"
+    assert p.turns[1].response_bytes == bytearray()
+
+
+def test_turn_summary_all_ansi_returns_no_output():
+    t = Turn(id=6, prompt_text="")
+    t.response_bytes.extend(b"\x1b[1m\x1b[0m\n\x1b[32m\x1b[0m\n")
+    assert t.summary() == "(no output)"
